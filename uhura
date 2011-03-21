@@ -31,7 +31,7 @@ sub HELP_MESSAGE {
 }
 #- - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - -
 our %opt;
-getopts('i:o:k:p:ehvu', \%opt) or die "Use '--help' for available options\n";
+getopts('i:o:k:p:ehvua:', \%opt) or die "Use '--help' for available options\n";
 our ($rdf, $out, $pem, $pwd) = @opt{qw[i o k p]};
 our $arg = 2 - defined($rdf) + defined($opt{u});
 #- - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - -
@@ -86,15 +86,16 @@ for my $xpi (@xpi) {
 }
 #*******************************************************************************
 if (@xpi && (defined($pem) || $opt{h})) {
-    open(SHA, '-|', 'openssl sha1 -hex '.join(' ', map {qq["$_->{xpi}"]} @xpi))
-        or die "Failed to run OpenSSL to calculate SHA1 hashes: $!\n";
+    my $algo = $opt{a} || "sha1";
+    open(SHA, '-|', "openssl dgst -$algo -hex ".join(' ', map {qq["$_->{xpi}"]} @xpi))
+        or die "Failed to run OpenSSL to calculate $algo hashes: $!\n";
     while(<SHA>) {
-        if (/^SHA1\((.*?)\)=\s*([[:xdigit:]]{40})\s*$/) {
-            $xpi[$xpi{$1}]->{sha} = "sha1:$2" if (exists($xpi{$1}));
+        if (/^\w+\((.*?)\)=\s*([[:xdigit:]]{40,})\s*$/) {
+            $xpi[$xpi{$1}]->{sha} = "$algo:$2" if (exists($xpi{$1}));
         }
     }
     close(SHA);
-    $? == 0 or die "OpenSSL failed to calculate SHA1 hashes\n";
+    $? == 0 or die "OpenSSL failed to calculate $algo hashes\n";
 }
 #*******************************************************************************
 sub xml($;$) {
@@ -607,6 +608,10 @@ corresponding XML character entities, which makes it compatible with US-ASCII
 character encoding. Note: in signing mode this option only affect parts
 generated or modified in the process, leaving the rest of the update manifest
 unchanged.
+
+=item B<-a>
+
+Specifies the algorithm for the updateHash tag. Default is sha1.
 
 =back
 
